@@ -1,0 +1,8 @@
+# dataset configs
+OPTIMAL: 1
+SUBOPTIMAL: 2
+TOTAL_FRAMECOUNT: 840
+TOTAL_SWEEPS: 6
+
+
+singlestack_dir: 'single_stack'
