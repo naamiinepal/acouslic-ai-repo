@@ -7,6 +7,7 @@ def read_image(img_path:Path):
 
 def write_image(img_path:Path):
     sitk.WriteImage()
+    
 def sitk_to_numpy(img:sitk.Image)->np.array:
     return sitk.GetArrayFromImage(img).swapaxes(0,-1) # swap axes to keep the size same
 
