@@ -1,0 +1,24 @@
+_target_: src.data.base_datamodule.BaseDataModule
+train_dataset:
+  _target_: src.data.datasets.AcouslicDataset
+  root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
+  csv_file: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai/acouslic_unstacked_sweeps.csv
+  transform:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.LoadImaged
+        keys: ['image', 'mask']
+      - _target_: monai.transforms.Resized
+        keys: ['image']
+        spatial_size: [544, 736]
+        mode: ['bilinear']
+      - _target_: monai.transforms.ToTensord
+        keys: ['image', 'mask']
+
+batch_size: 4 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
+train_val_split: [0.8, 0.2]
+num_workers: 4
+pin_memory: False
+collate_fn: 
+  _target_: src.data.datasets.collater.selective_data_collator_fn
+  _partial_: true
