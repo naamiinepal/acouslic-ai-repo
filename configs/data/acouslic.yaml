@@ -2,7 +2,22 @@ _target_: src.data.base_datamodule.BaseDataModule
 train_dataset:
   _target_: src.data.datasets.AcouslicDataset
   root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
-  csv_file: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai/acouslic_unstacked_sweeps.csv
+  csv_file: /mnt/SSD1/safal/acouslic/data_stats/artifacts/full_paths/train_full_paths.csv
+  transform:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.LoadImaged
+        keys: ['image', 'mask']
+      - _target_: monai.transforms.Resized
+        keys: ['image', 'mask']
+        spatial_size: [544, 736]
+        mode: ['bicubic', 'nearest-exact']
+      - _target_: monai.transforms.ToTensord
+        keys: ['image', 'mask']
+val_dataset:
+  _target_: src.data.datasets.AcouslicDataset
+  root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
+  csv_file: /mnt/SSD1/safal/acouslic/data_stats/artifacts/full_paths/test_full_paths.csv
   transform:
     _target_: monai.transforms.Compose
     transforms:

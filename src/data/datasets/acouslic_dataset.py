@@ -18,7 +18,7 @@ class AcouslicDataset(Dataset):
     ):
         self.root_dir = Path(root_dir)
 
-        self.image_mask_arr = pd.read_csv(csv_file, usecols=[1, 2]).to_numpy()
+        self.image_mask_arr = pd.read_csv(csv_file, usecols=['image_path', 'mask_path']).to_numpy()
 
         if transform is None:
             self.transform = Compose(
@@ -40,5 +40,5 @@ class AcouslicDataset(Dataset):
         mask = image_mask_dict["mask"]
 
         image_mask_dict["frame_type"] = torch.amax(mask, (1, 2))
-        
+
         return image_mask_dict
