@@ -44,6 +44,7 @@ class BaseModule(LightningModule):
         segmentation_lambda: float = 1,
         classification_lambda: float = 1,
         lr_scheduler_config:  _mapping_str_any | None = None,
+        weight_decay: float = 0.001
     ) -> None:
         super().__init__()
 
@@ -292,10 +293,10 @@ class BaseModule(LightningModule):
 
         """
         optim_groups = self.get_optim_groups()
-        optimizer = self.optimizer(optim_groups)  # type: ignore
+        optimizer = self.hparams.optimizer(optim_groups)  # type: ignore
 
-        if self.scheduler is not None:
-            scheduler = self.scheduler(optimizer=optimizer)
+        if self.hparams.scheduler is not None:
+            scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {

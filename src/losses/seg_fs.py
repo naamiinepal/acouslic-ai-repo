@@ -26,14 +26,13 @@ class SegmentationFrameSelectionLoss(_Loss):
             pred_mask.view(-1, 1, H, W), gt_mask.view(-1, 1, H, W)
         )
 
-        print(f'{pred_frame_logits.dtype=}, {gt_frame_types.dtype=}')
         frame_num_loss = self.classification_loss(
             pred_frame_logits.view(-1, 3), gt_frame_types.view(-1).long()
         )
 
         total_loss = (
-            self.segmentation_lambda * segmentation_loss
-            + self.classification_lambda * frame_num_loss
+            self.seg_lambda * segmentation_loss
+            + self.cls_lambda * frame_num_loss
         )
 
         return {

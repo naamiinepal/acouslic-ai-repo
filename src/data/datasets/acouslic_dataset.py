@@ -39,15 +39,6 @@ class AcouslicDataset(Dataset):
         image_mask_dict = self.transform(image_mask_dict)
         mask = image_mask_dict["mask"]
 
-        indices = torch.amax(mask, (1, 2))
-
-        image_mask_dict["frame_type"] = indices
-        bool_indices = indices.bool()
-
-        if not bool_indices.any():
-            mask = None
-        else:
-            mask = TF.interpolate(mask[bool_indices].unsqueeze(0), mode="nearest-exact", size=[544, 736])
+        image_mask_dict["frame_type"] = torch.amax(mask, (1, 2))
         
-        image_mask_dict["mask"] = mask
         return image_mask_dict
