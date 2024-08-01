@@ -32,10 +32,7 @@ class BaseModule(LightningModule):
     def __init__(
         self,
         net: nn.Module,
-        segmentation_criterion: Callable[
-            [torch.Tensor, torch.Tensor, bool], torch.Tensor
-        ],
-        classification_criterion: Callable[
+        criterion: Callable[
             [torch.Tensor, torch.Tensor, bool], torch.Tensor
         ],
         optimizer: torch.optim.Optimizer,
@@ -54,44 +51,17 @@ class BaseModule(LightningModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(
             logger=False,
-            ignore=["net", "segmentation_criterion", "classification_criterion"],
+            ignore=["net", "criterion"],
         )
 
         self.net = net
 
         # loss function
-        self.segmentation_criterion = segmentation_criterion
-        self.classification_criterion = classification_criterion
+        self.criterion = criterion
 
     def forward(self, *args, **kwargs):
         return self.net(*args, **kwargs)
 
-    def losses(self, pred_mask, pred_frame_logits, gt_mask, gt_frame_types):
-
-        # shape (pred_mask): B, 140, H, W -> B * 140, 1, H, W
-        # shape (gt_mask): B, 140, H, W -> B * 140, 1, H, W
-
-        B, C, H, W = pred_mask.shape
-
-        segmentation_loss = self.segmentation_criterion(
-            pred_mask.view(-1, 1, H, W), gt_mask.view(-1, 1, H, W)
-        )
-
-        print(f'{pred_frame_logits.dtype=}, {gt_frame_types.dtype=}')
-        frame_num_loss = self.classification_criterion(
-            pred_frame_logits.view(-1, 3), gt_frame_types.view(-1).long()
-        )
-
-        total_loss = (
-            self.hparams.segmentation_lambda * segmentation_loss
-            + self.hparams.classification_lambda * frame_num_loss
-        )
-
-        return {
-            "segmentation_loss": segmentation_loss,
-            "frame_num_loss": frame_num_loss,
-            "total_loss": total_loss,
-        }
 
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
@@ -104,7 +74,7 @@ class BaseModule(LightningModule):
 
         pred_masks, pred_frame_logits = self(image)
 
-        losses = self.losses(
+        losses = self.criterion(
             pred_mask=pred_masks,
             pred_frame_logits=pred_frame_logits,
             gt_mask=mask,
