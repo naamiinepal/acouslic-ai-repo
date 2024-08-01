@@ -6,3 +6,5 @@ TOTAL_SWEEPS: 6
 
 
 singlestack_dir: 'single_stack'
+image_dir: 'stacked_fetal_ultrasound'
+mask_dir: 'stacked_fetal_abdomen'
