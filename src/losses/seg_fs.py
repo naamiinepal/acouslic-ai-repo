@@ -7,19 +7,29 @@ import torch
 class SegmentationFrameSelectionLoss(_Loss):
     def __init__(
         self,
-        lambda_ce: float = 0.25,
+        lambda_ce: float = 0.05,
         sigmoid: bool = True,
         cls_weights: torch.Tensor = torch.tensor([0.2, 0.45, 0.35]),
+        seg_weights: torch.Tensor = torch.tensor([10]),
         seg_lambda: float = 1,
         cls_lambda: float = 1,
+        batch: bool = True,
     ):
         super().__init__()
         self.seg_lambda = seg_lambda
         self.cls_lambda = cls_lambda
         self.classification_loss = CrossEntropyLoss(weight=cls_weights)
-        self.segmentation_loss = DiceCELoss(sigmoid=sigmoid, lambda_ce=lambda_ce)
+        self.segmentation_loss = DiceCELoss(
+            sigmoid=sigmoid, lambda_ce=lambda_ce, batch=batch, weight=seg_weights
+        )
 
-    def forward(self, pred_mask: torch.Tensor, pred_frame_logits: torch.Tensor, gt_mask: torch.Tensor, gt_frame_types: torch.Tensor):
+    def forward(
+        self,
+        pred_mask: torch.Tensor,
+        pred_frame_logits: torch.Tensor,
+        gt_mask: torch.Tensor,
+        gt_frame_types: torch.Tensor,
+    ):
         B, C, H, W = pred_mask.shape
 
         segmentation_loss = self.segmentation_loss(
@@ -31,8 +41,7 @@ class SegmentationFrameSelectionLoss(_Loss):
         )
 
         total_loss = (
-            self.seg_lambda * segmentation_loss
-            + self.cls_lambda * frame_num_loss
+            self.seg_lambda * segmentation_loss + self.cls_lambda * frame_num_loss
         )
 
         return {
@@ -40,4 +49,3 @@ class SegmentationFrameSelectionLoss(_Loss):
             "frame_num_loss": frame_num_loss,
             "total_loss": total_loss,
         }
-        
