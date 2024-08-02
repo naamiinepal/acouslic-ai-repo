@@ -1,19 +1,32 @@
 import torch
+from torch import nn
 
 from typing import Sequence
 import segmentation_models_pytorch as smp
 
+
 class CustomUnet(smp.Unet):
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        classification_bias: torch.Tensor | None = None,
+        segmentation_bias: torch.Tensor | None = None,
+        **kwargs
+    ):
         num_classes = 3 * kwargs["in_channels"]
 
         aux_params = kwargs.get("aux_params")
         if aux_params is not None:
-          aux_params["classes"] = num_classes
+            aux_params["classes"] = num_classes
         else:
-          kwargs["aux_params"] =  {"classes": num_classes}
+            kwargs["aux_params"] = {"classes": num_classes}
 
         super().__init__(**kwargs)
+        with torch.no_grad():
+          if classification_bias is not None:
+              self.classification_head[-2].bias = nn.Parameter(classification_bias)
+            
+          if segmentation_bias is not None:
+              self.segmentation_head[0].bias = nn.Parameter(segmentation_bias)
 
     def get_pred_seg_num(self, pred_seg_logits: torch.Tensor):
         B = pred_seg_logits.size(0)
