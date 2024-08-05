@@ -2,8 +2,8 @@ import re
 from typing import Any, Callable, Mapping, Optional
 
 import torch
-from monai.networks import one_hot
-from monai.metrics.meandice import compute_dice
+from monai.networks.utils import one_hot
+from monai.metrics import DiceMetric
 from monai.metrics.meaniou import compute_iou
 from pytorch_lightning import LightningModule
 from pytorch_lightning.loggers.wandb import WandbLogger
@@ -37,14 +37,15 @@ class BaseModule(LightningModule):
         ],
         optimizer: torch.optim.Optimizer,
         scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
-        scheduler_monitor: str = "val/loss",
+        scheduler_monitor: str = "val/total_loss",
         threshold: float = 0.5,
         multi_class: bool = True,
         log_output_masks: bool = True,
         segmentation_lambda: float = 1,
         classification_lambda: float = 1,
         lr_scheduler_config:  _mapping_str_any | None = None,
-        weight_decay: float = 0.001
+        weight_decay: float = 0.001,
+        compile: bool = False,
     ) -> None:
         super().__init__()
 
@@ -55,10 +56,14 @@ class BaseModule(LightningModule):
             ignore=["net", "criterion"],
         )
 
-        self.net = net
+        self.net = torch.compile(net) if compile else net
 
         # loss function
         self.criterion = criterion
+        self.train_dice_metric = DiceMetric(ignore_empty=False, num_classes=1, include_background=True)
+        self.val_dice_metric = DiceMetric(ignore_empty=False, num_classes=1, include_background=True)
+        self.test_dice_metric = DiceMetric(ignore_empty=False, num_classes=1, include_background=True)
+
 
     def forward(self, *args, **kwargs):
         return self.net(*args, **kwargs)
@@ -67,8 +72,7 @@ class BaseModule(LightningModule):
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
-        # self.val_acc_best.reset()
-        pass
+        self.val_dice_metric.reset()
 
     def step(self, batch: _mapping_str_any) -> _mapping_str_any:
         image, mask, frame_type = batch["image"], batch["mask"], batch["frame_type"]
@@ -81,6 +85,10 @@ class BaseModule(LightningModule):
             gt_mask=mask,
             gt_frame_types=frame_type,
         )
+
+        # Convert prediction sigmoids to binary masks
+        pred_masks = pred_masks > self.hparams.threshold
+
 
         out = dict(
             **losses,
@@ -98,6 +106,8 @@ class BaseModule(LightningModule):
             frame_num_loss=out["frame_num_loss"],
             total_loss=out["total_loss"],
         )
+
+
 
         self.log(
             "train/seg_loss",
@@ -124,19 +134,29 @@ class BaseModule(LightningModule):
             batch_size=images.shape[0],
         )
 
+        B, C, H, W = images.shape
+        train_dice_step = self.train_dice_metric(out['pred_masks'].view(-1, 1, H, W), batch['mask'].view(-1, 1, H, W))
+        self.log(
+            "train/dice",
+            train_dice_step.mean().item(),
+            on_step=True,
+            on_epoch=False,
+            prog_bar=True,
+            batch_size=images.shape[0],
+        )
+
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()` below
         # remember to always return loss from `training_step()` or backpropagation will fail!
         return losses['total_loss']
 
     def on_train_epoch_end(self):
-        pass
+        self.log(
+            "train/dice",
+            self.train_dice_metric.aggregate().item(),
+        )
+        self.train_dice_metric.reset()
 
-    def compile(self):
-        assert re.match(
-            r"2.", torch.__version__
-        ), "Pytorch version >= 2.X is required to use compile() method."
-        return torch.compile(self)
 
     def validation_step(self, batch: _mapping_str_any, batch_idx: int):
         out = self.step(batch)
@@ -149,34 +169,35 @@ class BaseModule(LightningModule):
             total_loss=out["total_loss"],
         )
 
-        # Log images at the start of validation step
-        if (
-            batch_idx == 0
-            and isinstance(self.logger, WandbLogger)
-            and self.hparams.log_output_masks
-        ):
-            # Only Log 16 images at max
-            max_images_logs = 16
-            if len(targets) < max_images_logs:
-                max_images_logs = len(targets)
 
-            self.logger.log_image(
-                key="val/image", images=list(images.float())[:max_images_logs]
-            )
-            self.logger.log_image(
-                key="val/target_mask", images=list(targets.float())[:max_images_logs]
-            )
-            self.logger.log_image(
-                key="val/pred_mask",
-                images=list(((out["pred_masks"] > self.hparams.threshold) * 1).float())[
-                    :max_images_logs
-                ],
-            )
+        # Log images at the start of validation step
+        # if (
+        #     batch_idx == 0
+        #     and isinstance(self.logger, WandbLogger)
+        #     and self.hparams.log_output_masks
+        # ):
+        #     # Only Log 16 images at max
+        #     max_images_logs = 16
+        #     if len(targets) < max_images_logs:
+        #         max_images_logs = len(targets)
+
+        #     self.logger.log_image(
+        #         key="val/image", images=list(images.float())[:max_images_logs]
+        #     )
+        #     self.logger.log_image(
+        #         key="val/target_mask", images=list(targets.float())[:max_images_logs]
+        #     )
+        #     self.logger.log_image(
+        #         key="val/pred_mask",
+        #         images=list(((out["pred_masks"] > self.hparams.threshold) * 1).float())[
+        #             :max_images_logs
+        #         ],
+        #     )
 
         self.log(
             "val/seg_loss",
             losses["seg_loss"],
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             prog_bar=True,
             batch_size=images.shape[0],
@@ -184,7 +205,7 @@ class BaseModule(LightningModule):
         self.log(
             "val/frame_num_loss",
             losses["frame_num_loss"],
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             prog_bar=True,
             batch_size=images.shape[0],
@@ -192,13 +213,16 @@ class BaseModule(LightningModule):
         self.log(
             "val/total_loss",
             losses["total_loss"],
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             prog_bar=True,
             batch_size=images.shape[0],
         )
 
-        return None
+        B, C, H, W = images.shape
+        self.val_dice_metric(out['pred_masks'].view(-1, 1, H, W), batch['mask'].view(-1, 1, H, W))
+
+
 
     def on_validation_epoch_end(self):
         # acc = self.val_acc.compute()  # get current val acc
@@ -206,7 +230,11 @@ class BaseModule(LightningModule):
         # # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # # otherwise metric would be reset by lightning after each epoch
         # self.log("val/acc_best", self.val_acc_best.compute(), prog_bar=True, batch_size=images.shape[0])
-        pass
+        self.log(
+            "val/dice",
+            self.val_dice_metric.aggregate().item(),
+        )
+        self.val_dice_metric.reset()
 
     def test_step(self, batch: _mapping_str_any, batch_idx: int):
         pass
