@@ -1,8 +1,9 @@
 _target_: src.data.base_datamodule.BaseDataModule
 train_dataset:
-  _target_: src.data.datasets.AcouslicDataset
-  root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
+  _target_: src.data.datasets.AcouslicPersistantDataset
   csv_file: /mnt/SSD1/safal/acouslic/data_stats/artifacts/full_paths/train_full_paths.csv
+  cache_dir: cache/custom2dunetMTL
+  pickle_protocol: 5
   transform:
     _target_: monai.transforms.Compose
     transforms:
@@ -630,5 +631,5 @@ val_dataset:
 
 batch_size: 4 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
 train_val_split: [0.8, 0.2]
-num_workers: 8
+num_workers: 12
 pin_memory: True

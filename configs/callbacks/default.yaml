@@ -7,7 +7,7 @@ defaults:
 
 model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
-  filename: "best"
+  filename: "best_epoch_{epoch:03d}"
   monitor: "val/total_loss"
   mode: "min"
   save_last: True
