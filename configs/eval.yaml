@@ -2,9 +2,10 @@
 
 defaults:
   - _self_
-  - data: mnist # choose datamodule with `test_dataloader()` for evaluation
-  - model: mnist
+  - data: acouslic_sample
+  - model: acouslic
   - logger: null
+  - callbacks: default
   - trainer: default
   - paths: default
   - extras: default
@@ -12,7 +13,7 @@ defaults:
 
 task_name: "eval"
 
-tags: ["dev"]
+tags: ["dev", "acouslic"]
 
 # passing checkpoint path is necessary for evaluation
-ckpt_path: ???
+ckpt_path: ""

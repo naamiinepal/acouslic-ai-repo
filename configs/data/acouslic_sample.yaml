@@ -1,0 +1,36 @@
+_target_: src.data.base_datamodule.BaseDataModule
+train_dataset:
+  _target_: src.data.datasets.AcouslicDataset
+  root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
+  csv_file: /mnt/SSD1/safal/acouslic/data_stats/artifacts/full_paths/sample_train_full_paths.csv
+  transform:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.LoadImaged
+        keys: ['image', 'mask']
+      - _target_: monai.transforms.Resized
+        keys: ['image', 'mask']
+        spatial_size: [544, 736]
+        mode: ['bicubic', 'nearest-exact']
+      - _target_: monai.transforms.ToTensord
+        keys: ['image', 'mask']
+val_dataset:
+  _target_: src.data.datasets.AcouslicDataset
+  root_dir: /mnt/Enterprise2/PUBLIC_DATASETS/acouslic-ai
+  csv_file: /mnt/SSD1/safal/acouslic/data_stats/artifacts/full_paths/sample_test_full_paths.csv
+  transform:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.LoadImaged
+        keys: ['image', 'mask']
+      - _target_: monai.transforms.Resized
+        keys: ['image', 'mask']
+        spatial_size: [544, 736]
+        mode: ['bicubic', 'nearest-exact']
+      - _target_: monai.transforms.ToTensord
+        keys: ['image', 'mask']
+
+batch_size: 4 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
+train_val_split: [0.8, 0.2]
+num_workers: 4
+pin_memory: True
