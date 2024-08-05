@@ -1,4 +1,7 @@
 python-dotenv
+# --------- monai  -----------#
+monai==1.3.2
+segmentation_models_pytorch==0.3.3
 # --------- pytorch --------- #
 torch>=2.0.0
 torchvision>=0.15.0
