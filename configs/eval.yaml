@@ -5,7 +5,7 @@ defaults:
   - data: acouslic_sample
   - model: acouslic
   - logger: null
-  - callbacks: default
+  - callbacks: eval
   - trainer: default
   - paths: default
   - extras: default

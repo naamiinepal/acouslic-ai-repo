@@ -23,6 +23,7 @@ val_dataset:
     transforms:
       - _target_: monai.transforms.LoadImaged
         keys: ['image', 'mask']
+        image_only: False
       - _target_: monai.transforms.Resized
         keys: ['image', 'mask']
         spatial_size: [544, 736]
