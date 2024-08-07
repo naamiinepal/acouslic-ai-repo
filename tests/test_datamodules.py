@@ -1,38 +1,51 @@
-from pathlib import Path
-
+import numpy as np
 import pytest
 import torch
 
-from src.data.base_datamodule import MNISTDataModule
+import pyrootutils
+import omegaconf
+import hydra
+import pytest_check as check
 
+class TestDataModule:
+    root = pyrootutils.setup_root(__file__, pythonpath=True)
+    cfg = omegaconf.OmegaConf.load(root / "configs" / "data" / "acouslic_sample.yaml")
+    acouslic_datamodule = hydra.utils.instantiate(cfg)
 
-@pytest.mark.parametrize("batch_size", [32, 128])
-def test_mnist_datamodule(batch_size: int) -> None:
-    """Tests `MNISTDataModule` to verify that it can be downloaded correctly, that the necessary
-    attributes were created (e.g., the dataloader objects), and that dtypes and batch sizes
-    correctly match.
+    def test_metadata(self):
+        sample_data = self.acouslic_datamodule.data_val[0]
+        assert False, sample_data['image'].meta.keys()
+        assert False, sample_batch
 
-    :param batch_size: Batch size of the data to be loaded by the dataloader.
-    """
-    data_dir = "data/"
+    def test_datatype(self):
+        # test trainloader
+        trainloader = self.acouslic_datamodule.train_dataloader()
+        sample_batch = next(iter(trainloader))
+        
+        
+        # existence test
+        assert "image" in sample_batch.keys()
+        assert "mask" in sample_batch.keys()
+        assert "frame_type" in sample_batch.keys()
 
-    dm = MNISTDataModule(data_dir=data_dir, batch_size=batch_size)
-    dm.prepare_data()
+        # data type test
+        images = sample_batch['image']
+        masks = sample_batch['mask']
+        frame_types = sample_batch['frame_type']
+        check.equal(images.dtype, torch.float32)
+        check.equal(masks.dtype,torch.int64)
+        
+        # size test
+        B,C,H,W = images.shape
+        check.equal((C,H,W),(140,544,736))
 
-    assert not dm.data_train and not dm.data_val and not dm.data_test
-    assert Path(data_dir, "MNIST").exists()
-    assert Path(data_dir, "MNIST", "raw").exists()
+        B,C,H,W = masks.shape
+        check.equal((C,H,W),(140,544,736))
 
-    dm.setup()
-    assert dm.data_train and dm.data_val and dm.data_test
-    assert dm.train_dataloader() and dm.val_dataloader() and dm.test_dataloader()
+        B,C = frame_types.shape
+        check.equal(C,140)
 
-    num_datapoints = len(dm.data_train) + len(dm.data_val) + len(dm.data_test)
-    assert num_datapoints == 70_000
+        check.equal(torch.unique(masks),torch.from_numpy(np.array([0,1,2])))
 
-    batch = next(iter(dm.train_dataloader()))
-    x, y = batch
-    assert len(x) == batch_size
-    assert len(y) == batch_size
-    assert x.dtype == torch.float32
-    assert y.dtype == torch.int64
+        check.is_greater_than(torch.min(images[0]),-3.0)
+        check.is_less_than(torch.max(images[0]),3.0)
